@@ -13,7 +13,7 @@ dependencies:
   flutter_riverpod: ^2.6.1
   dio: ^5.7.0
   file_picker: ^8.1.7
-  ffmpeg_kit_flutter_new: ^1.0.0
+  ffmpeg_kit_flutter_new: ^4.6.2
   lottie: ^3.2.0
   audio_waveforms: ^1.1.0
   just_audio: ^0.9.42
