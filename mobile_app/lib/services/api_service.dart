@@ -27,7 +27,7 @@ class ApiService {
   }
 
   Future<JobStatus> status(String jobId) async {
-    try { final response = await _dio.get<Map<String, dynamic>>('/api/v1/status/$jobId'); return JobStatus(response.data!['progress'] as int, response.data!['status'] as String); } on DioException catch (error) { throw ApiException(error.message ?? 'Status request failed'); }
+    try { final response = await _dio.get<Map<String, dynamic>>('/api/v1/status/$jobId'); final data = response.data!; return JobStatus(data['progress'] as int, data['status'] as String, error: data['error'] as String?); } on DioException catch (error) { throw ApiException(error.message ?? 'Status request failed'); }
   }
 
   Future<Project> result(Project project) async {

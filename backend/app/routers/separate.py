@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import logging
 import os
 import shutil
 import uuid
@@ -15,6 +15,7 @@ from app.services.demucs_service import separate_audio
 from app.services.ffmpeg_service import extract_audio, is_video, mux_audio, probe_duration
 
 router = APIRouter(prefix="/api/v1", tags=["separation"])
+logger = logging.getLogger(__name__)
 OUTPUTS_DIR = Path(os.getenv("OUTPUTS_DIR", "/tmp/outputs"))
 MAX_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(500 * 1024 * 1024)))
 MAX_DURATION = float(os.getenv("MAX_VIDEO_DURATION_SECONDS", "1800"))
@@ -43,6 +44,7 @@ class QueuedResponse(BaseModel):
 class StatusResponse(BaseModel):
     progress: int
     status: Literal["queued", "processing", "done", "failed"]
+    error: str | None = None
 
 
 class ResultResponse(BaseModel):
@@ -73,6 +75,7 @@ def _process(job_id: str, source: Path, mode: str) -> None:
             job.video = video.name
         job.progress, job.status = 100, "done"
     except Exception as exc:  # preserve a readable job failure for polling clients
+        logger.exception("Audio separation job %s failed", job_id)
         job.status, job.error = "failed", str(exc)
 
 
@@ -119,7 +122,7 @@ async def job_status(job_id: str) -> StatusResponse:
     job = JOBS.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return StatusResponse(progress=job.progress, status=job.status)
+    return StatusResponse(progress=job.progress, status=job.status, error=job.error)
 
 
 @router.get("/result/{job_id}", response_model=ResultResponse)

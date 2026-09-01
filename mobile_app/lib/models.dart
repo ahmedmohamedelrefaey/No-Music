@@ -14,7 +14,8 @@ class Project {
 }
 
 class JobStatus {
-  const JobStatus(this.progress, this.status);
+  const JobStatus(this.progress, this.status, {this.error});
   final int progress;
   final String status;
+  final String? error;
 }
