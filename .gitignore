@@ -1,0 +1,27 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.idea/
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets and generated audio
+.env
+.env.*
+!.env.example
+firebase_options.dart
+google-services.json
+GoogleService-Info.plist
+outputs/
+*.wav
+*.mp3
+*.m4a
+*.mp4

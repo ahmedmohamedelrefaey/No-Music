@@ -1,0 +1,13 @@
+{
+  "appTitle": "ميوت ميوزك AI",
+  "importMedia": "استيراد فيديو أو صوت",
+  "recentProjects": "المشاريع الأخيرة",
+  "keepVocals": "الاحتفاظ بالصوت البشري",
+  "keepMusic": "الاحتفاظ بالموسيقى",
+  "startSeparation": "بدء المعالجة",
+  "processing": "جارٍ فصل الصوت",
+  "export": "تصدير",
+  "share": "مشاركة",
+  "settings": "الإعدادات",
+  "language": "اللغة"
+}

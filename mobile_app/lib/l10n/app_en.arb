@@ -1,0 +1,13 @@
+{
+  "appTitle": "MuteMusic AI",
+  "importMedia": "Import video or audio",
+  "recentProjects": "Recent projects",
+  "keepVocals": "Keep vocals",
+  "keepMusic": "Keep music",
+  "startSeparation": "Start separation",
+  "processing": "Separating audio",
+  "export": "Export",
+  "share": "Share",
+  "settings": "Settings",
+  "language": "Language"
+}
