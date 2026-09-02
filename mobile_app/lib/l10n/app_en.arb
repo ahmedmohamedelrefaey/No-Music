@@ -9,5 +9,17 @@
   "export": "Export",
   "share": "Share",
   "settings": "Settings",
-  "language": "Language"
+  "language": "Language",
+  "heroTitle": "Separate vocals from music in seconds",
+  "heroSubtitle": "Clean music from video and audio with AI",
+  "uploadPrompt": "Drop a file or tap to choose",
+  "supportedFormats": "MP3, WAV, MP4, MOV up to 500MB",
+  "removeMusic": "Remove music and keep vocals",
+  "chooseAnotherFile": "Choose another file",
+  "noRecentProjects": "No recent projects yet",
+  "startFirstProject": "Upload your first file to get started",
+  "complete": "Complete",
+  "inProgress": "Processing",
+  "autoDeleteNotice": "Your file is deleted from the server after processing",
+  "selectedFile": "Selected file"
 }

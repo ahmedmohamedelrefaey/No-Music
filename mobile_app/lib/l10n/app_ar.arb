@@ -9,5 +9,17 @@
   "export": "تصدير",
   "share": "مشاركة",
   "settings": "الإعدادات",
-  "language": "اللغة"
+  "language": "اللغة",
+  "heroTitle": "افصل الصوت البشري عن الموسيقى في ثوانٍ",
+  "heroSubtitle": "نظّف الفيديو والصوت من الموسيقى بذكاء اصطناعي",
+  "uploadPrompt": "اسحب وأفلت أو اضغط للاختيار",
+  "supportedFormats": "MP3، WAV، MP4، MOV حتى 500MB",
+  "removeMusic": "إزالة الموسيقى وترك الصوت",
+  "chooseAnotherFile": "اختيار ملف آخر",
+  "noRecentProjects": "لا توجد عمليات سابقة بعد",
+  "startFirstProject": "ارفع أول ملف لتبدأ",
+  "complete": "مكتمل",
+  "inProgress": "جارٍ المعالجة",
+  "autoDeleteNotice": "يُحذف الملف تلقائيًا من الخادم بعد المعالجة",
+  "selectedFile": "الملف المختار"
 }
