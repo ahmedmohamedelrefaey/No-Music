@@ -29,6 +29,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
   _PreviewTrack _selectedTrack = _PreviewTrack.vocals;
   String? _loadedSource;
   bool _isExporting = false;
+  bool _isExportingVideo = false;
   int _exportProgress = 0;
 
   @override
@@ -85,9 +86,17 @@ class _PreviewScreenState extends State<PreviewScreen> {
     return '${stem}_$suffix.wav';
   }
 
+  String _videoFileName() {
+    final stem = widget.project.name.replaceAll(RegExp(r'\.[^.]+$'), '');
+    return '${stem}_processed.mp4';
+  }
+
   Future<void> _export() async {
     if (_selectedTrack == _PreviewTrack.original) {
-      await _shareFile(File(widget.project.originalPath));
+      await _shareFile(
+        File(widget.project.originalPath),
+        subject: 'MuteMusic AI - الأصل',
+      );
       return;
     }
 
@@ -111,7 +120,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       );
       Integrations.track('export_completed');
       if (!mounted) return;
-      await _shareFile(file);
+      await _shareFile(file, subject: 'MuteMusic AI - ${_labelFor(_selectedTrack)}');
     } on ApiException catch (error) {
       _showMessage('فشل تنزيل الملف: ${error.message}');
     } finally {
@@ -119,14 +128,49 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  Future<void> _shareFile(File file) async {
+  Future<void> _exportVideo() async {
+    final url = widget.project.videoUrl;
+    if (url == null || url.isEmpty) {
+      _showMessage('ملف الفيديو المعالَج غير متاح بعد.');
+      return;
+    }
+
+    setState(() {
+      _isExporting = true;
+      _isExportingVideo = true;
+      _exportProgress = 0;
+    });
+    try {
+      final file = await _api.downloadOutput(
+        url,
+        _videoFileName(),
+        onProgress: (progress) {
+          if (mounted) setState(() => _exportProgress = progress);
+        },
+      );
+      Integrations.track('video_export_completed');
+      if (!mounted) return;
+      await _shareFile(file, subject: 'MuteMusic AI - الفيديو المعالَج');
+    } on ApiException catch (error) {
+      _showMessage('فشل تنزيل الفيديو: ${error.message}');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+          _isExportingVideo = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _shareFile(File file, {required String subject}) async {
     if (!await file.exists()) {
       _showMessage('الملف غير موجود على الجهاز.');
       return;
     }
     await Share.shareXFiles(
       [XFile(file.path)],
-      subject: 'MuteMusic AI - ${_labelFor(_selectedTrack)}',
+      subject: subject,
     );
   }
 
@@ -185,12 +229,20 @@ class _PreviewScreenState extends State<PreviewScreen> {
               if (_isExporting) ...[
                 LinearProgressIndicator(value: _exportProgress / 100),
                 const SizedBox(height: 8),
-                Text('جارٍ تجهيز الملف $_exportProgress%', textAlign: TextAlign.center),
+                Text(_isExportingVideo ? 'جارٍ تجهيز الفيديو $_exportProgress%' : 'جارٍ تجهيز الملف $_exportProgress%', textAlign: TextAlign.center),
                 const SizedBox(height: 12),
               ],
               FilledButton.icon(onPressed: _isExporting ? null : _export, icon: const Icon(Icons.ios_share), label: Text(_isExporting ? 'جارٍ التصدير…' : 'تصدير ومشاركة')),
+              if (widget.project.isVideo && (widget.project.videoUrl?.isNotEmpty ?? false)) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _isExporting ? null : _exportVideo,
+                  icon: const Icon(Icons.video_file_outlined),
+                  label: Text(_isExporting ? 'جارٍ التصدير…' : 'تصدير الفيديو المعالَج'),
+                ),
+              ],
               const SizedBox(height: 10),
-              Text('سيُنزّل الملف إلى مساحة التطبيق ثم يفتح قائمة المشاركة والحفظ في جهازك.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              Text(widget.project.isVideo ? 'يمكنك تصدير الصوت منفصلًا أو تصدير الفيديو مع المسار الصوتي الذي اخترته.' : 'سيُنزّل الملف إلى مساحة التطبيق ثم يفتح قائمة المشاركة والحفظ في جهازك.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ],
           ),
         ),
