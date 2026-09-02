@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models.dart';
 
 class ApiException implements Exception {
@@ -34,5 +35,22 @@ class ApiService {
     final response = await _dio.get<Map<String, dynamic>>('/api/v1/result/${project.jobId}');
     final data = response.data!;
     return project.copyWith(vocalsUrl: data['vocals_url'] as String, instrumentalUrl: data['instrumental_url'] as String, videoUrl: data['video_url_if_needed'] as String?);
+  }
+
+  Future<File> downloadOutput(String url, String fileName, {void Function(int progress)? onProgress}) async {
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final exportDirectory = Directory('${documentsDirectory.path}${Platform.pathSeparator}exports');
+    if (!await exportDirectory.exists()) await exportDirectory.create(recursive: true);
+
+    final safeName = fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    final target = File('${exportDirectory.path}${Platform.pathSeparator}$safeName');
+    try {
+      await _dio.download(url, target.path, onReceiveProgress: (received, total) {
+        if (total > 0) onProgress?.call(received * 100 ~/ total);
+      });
+      return target;
+    } on DioException catch (error) {
+      throw ApiException(error.message ?? 'Download failed');
+    }
   }
 }
