@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_localizations.dart';
 import '../models.dart';
 import '../services/integrations.dart';
+import '../theme.dart';
+import '../widgets/status_dot.dart';
 import 'processing_screen.dart';
 import 'settings_screen.dart';
 
@@ -22,6 +24,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   File? _file;
+  ProcessingQuality _quality = ProcessingQuality.deep;
 
   Future<void> _pickFile() async {
     await HapticFeedback.lightImpact();
@@ -46,8 +49,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             name: file.uri.pathSegments.last,
             originalPath: file.path,
             isVideo: isVideo,
+            quality: _quality,
           ),
-          mode: SeparationMode.keepVocals,
         ),
       ),
     );
@@ -57,7 +60,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
     final projects = ref.watch(projectsProvider);
-    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: SafeArea(
@@ -107,20 +109,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 32),
             Text(
               strings.heroTitle,
-              style: const TextStyle(
-                fontSize: 30,
-                height: 1.28,
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(context).textTheme.displayLarge,
             ),
             const SizedBox(height: 10),
             Text(
               strings.heroSubtitle,
-              style: TextStyle(
-                color: scheme.onSurfaceVariant,
-                fontSize: 15,
-                height: 1.6,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 28),
             _UploadCard(
@@ -143,26 +137,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
             const SizedBox(height: 24),
+            _QualitySelector(
+              selected: _quality,
+              strings: strings,
+              onSelect: (quality) => setState(() => _quality = quality),
+            ),
+            const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: _file == null ? null : _startProcessing,
               icon: const Icon(Icons.music_off_rounded),
               label: Text(strings.removeMusic),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.verified_user_outlined,
-                    size: 16, color: scheme.primary),
+                    size: 16, color: AppColors.primaryLight),
                 const SizedBox(width: 7),
                 Flexible(
                   child: Text(
                     strings.autoDeleteNotice,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: scheme.onSurfaceVariant,
-                      fontSize: 12,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
               ],
@@ -170,7 +167,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(height: 36),
             Text(
               strings.recentProjects,
-              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
             if (projects.isEmpty)
@@ -190,6 +187,163 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QualitySelector extends StatelessWidget {
+  const _QualitySelector({
+    required this.selected,
+    required this.strings,
+    required this.onSelect,
+  });
+
+  final ProcessingQuality selected;
+  final AppLocalizations strings;
+  final ValueChanged<ProcessingQuality> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(strings.qualityTitle,
+            style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _QualityCard(
+                  title: strings.qualityFast,
+                  description: strings.qualityFastDesc,
+                  selected: selected == ProcessingQuality.fast,
+                  onTap: () => onSelect(ProcessingQuality.fast),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _QualityCard(
+                  title: strings.qualityDeep,
+                  description: strings.qualityDeepDesc,
+                  aiTag: strings.qualityDeepTag,
+                  selected: selected == ProcessingQuality.deep,
+                  onTap: () => onSelect(ProcessingQuality.deep),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Icon(Icons.info_outline,
+                  size: 14, color: AppColors.helperText),
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                selected == ProcessingQuality.deep
+                    ? '${strings.qualityHonestNote} ${strings.qualityDeepNote}'
+                    : strings.qualityHonestNote,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _QualityCard extends StatelessWidget {
+  const _QualityCard({
+    required this.title,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+    this.aiTag,
+  });
+
+  final String title;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+  final String? aiTag;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.primary : AppColors.card,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? AppColors.primaryLight : AppColors.border,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: selected
+                      ? AppColors.primaryText
+                      : AppColors.secondaryText,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: TextStyle(
+                  color: selected
+                      ? AppColors.primaryText.withValues(alpha: .92)
+                      : AppColors.helperText,
+                  fontSize: 12,
+                  height: 1.55,
+                ),
+              ),
+              if (aiTag != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 13,
+                      color: selected ? Colors.white : AppColors.primaryLight,
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        aiTag!,
+                        style: TextStyle(
+                          color: selected
+                              ? AppColors.primaryText
+                              : AppColors.primaryLight,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -221,13 +375,12 @@ class _UploadCard extends StatelessWidget {
       height: 200,
       child: CustomPaint(
         painter: _DashedRoundedBorderPainter(
-          color:
-              hasFile ? scheme.primary : scheme.outline.withValues(alpha: .55),
+          color: hasFile ? scheme.primary : AppColors.border,
         ),
         child: Material(
           color: hasFile
               ? scheme.primary.withValues(alpha: .08)
-              : const Color(0xFF1A1A1A),
+              : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
@@ -255,7 +408,9 @@ class _UploadCard extends StatelessWidget {
                   const SizedBox(height: 13),
                   Text(
                     hasFile ? selectedFileLabel : title,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primaryText),
                   ),
                   const SizedBox(height: 5),
                   Text(
@@ -263,16 +418,17 @@ class _UploadCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: scheme.onSurfaceVariant,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(
+                        color: AppColors.helperText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                   if (hasFile) ...[
                     const SizedBox(height: 8),
                     Text(
                       changeFileLabel,
-                      style: TextStyle(color: scheme.primary, fontSize: 12),
+                      style: const TextStyle(
+                          color: AppColors.primaryLight, fontSize: 12),
                     ),
                   ],
                 ],
@@ -294,11 +450,17 @@ class _FormatChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: const Color(0xFF1F1F1F),
+          color: AppColors.card,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withValues(alpha: .08)),
+          border: Border.all(color: AppColors.border),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 12)),
+        child: Text(
+          label,
+          style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.secondaryText),
+        ),
       );
 }
 
@@ -314,7 +476,7 @@ class _EmptyProjectsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F1F1F),
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -322,12 +484,12 @@ class _EmptyProjectsCard extends StatelessWidget {
           Icon(Icons.folder_open_outlined,
               size: 30, color: scheme.onSurfaceVariant),
           const SizedBox(height: 9),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 4),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ),
@@ -349,12 +511,13 @@ class _RecentProjectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isComplete = project.vocalsUrl != null;
-    final statusColor =
-        isComplete ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+    final statusColor = isComplete ? AppColors.success : AppColors.warning;
+    final statusTextColor =
+        isComplete ? AppColors.successText : AppColors.warning;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F1F1F),
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -363,12 +526,12 @@ class _RecentProjectCard extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: const Color(0xFF7C3AED).withValues(alpha: .15),
+              color: AppColors.primary.withValues(alpha: .15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               project.isVideo ? Icons.movie_outlined : Icons.audiotrack_rounded,
-              color: const Color(0xFFA78BFA),
+              color: AppColors.primaryLight,
             ),
           ),
           const SizedBox(width: 12),
@@ -377,7 +540,7 @@ class _RecentProjectCard extends StatelessWidget {
               project.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
           ),
           const SizedBox(width: 8),
@@ -387,13 +550,20 @@ class _RecentProjectCard extends StatelessWidget {
               color: statusColor.withValues(alpha: .14),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Text(
-              isComplete ? completeLabel : processingLabel,
-              style: TextStyle(
-                color: statusColor,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StatusDot(color: statusColor, size: 7),
+                const SizedBox(width: 6),
+                Text(
+                  isComplete ? completeLabel : processingLabel,
+                  style: TextStyle(
+                    color: statusTextColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

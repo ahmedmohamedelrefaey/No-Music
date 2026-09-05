@@ -3,17 +3,24 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+# "fast" keeps the default htdemucs settings; "deep" averages multiple shifted
+# runs (and blends overlapping segments more) for lower residual instruments at
+# a genuinely higher processing cost.
+DEEP_SHIFTS = "5"
+DEEP_OVERLAP = "0.5"
+
 
 class DemucsError(RuntimeError):
     pass
 
 
-def separate_audio(input_path: Path, output_root: Path) -> tuple[Path, Path]:
+def separate_audio(input_path: Path, output_root: Path, quality: str = "fast") -> tuple[Path, Path]:
     """Run htdemucs two-stem separation and return vocals and no-vocals WAV paths."""
     output_root.mkdir(parents=True, exist_ok=True)
-    command = (
-        "demucs", "--two-stems=vocals", "-n", "htdemucs", "--out", str(output_root), str(input_path),
-    )
+    command = ["demucs", "--two-stems=vocals", "-n", "htdemucs", "--out", str(output_root)]
+    if quality == "deep":
+        command += ["--shifts", DEEP_SHIFTS, "--overlap", DEEP_OVERLAP]
+    command.append(str(input_path))
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         # Combine both outputs for debugging on Windows

@@ -45,10 +45,10 @@ For an iOS simulator use `http://localhost:8000`; physical devices require the h
 ## API example
 
 ```bash
-curl -F "file=@sample.mp4" -F "mode=keep_vocals" http://localhost:8000/api/v1/separate
+curl -F "file=@sample.mp4" -F "mode=keep_vocals" -F "quality=deep" http://localhost:8000/api/v1/separate
 ```
 
-Poll `/api/v1/status/{job_id}`, then read `/api/v1/result/{job_id}` once status is `done`.
+Poll `/api/v1/status/{job_id}`, then read `/api/v1/result/{job_id}` once status is `done`. Clients may delete their job files at any time with `DELETE /api/v1/jobs/{job_id}`; everything is also deleted automatically after `FILE_RETENTION_HOURS` (default 24).
 
 ## Integrations Status
 
