@@ -131,6 +131,21 @@ def test_delete_job_is_idempotent_and_safe(client, fake_separation, outputs_dir)
     assert client.delete("/api/v1/jobs/..%2F..%2Fetc").status_code == 404
 
 
+def test_delete_rejects_active_job_without_touching_files(client, outputs_dir):
+    job_id = str(uuid.uuid4())
+    job_dir = outputs_dir / job_id
+    job_dir.mkdir()
+    (job_dir / "original.wav").write_bytes(b"still-processing")
+    separate.JOBS[job_id] = separate.Job(status="processing", progress=42)
+
+    response = client.delete(f"/api/v1/jobs/{job_id}")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Job is still processing"
+    assert job_dir.exists()
+    assert job_id in separate.JOBS
+
+
 def test_retention_parsing_falls_back_to_24h():
     assert separate.parse_retention_hours(None) == 24.0
     assert separate.parse_retention_hours("") == 24.0
@@ -153,8 +168,8 @@ def test_retention_sweep_deletes_only_expired_jobs(monkeypatch, outputs_dir):
     (fresh_dir / "vocals.wav").write_bytes(b"b")
     expired = time.time() - (25 * 3600)
     os.utime(old_dir, (expired, expired))
-    separate.JOBS[old_id] = separate.Job()
-    separate.JOBS[fresh_id] = separate.Job()
+    separate.JOBS[old_id] = separate.Job(status="done")
+    separate.JOBS[fresh_id] = separate.Job(status="done")
 
     monkeypatch.setattr(separate, "FILE_RETENTION_HOURS", 24.0)
     removed = separate.sweep_expired_jobs()
@@ -166,13 +181,28 @@ def test_retention_sweep_deletes_only_expired_jobs(monkeypatch, outputs_dir):
     assert fresh_id in separate.JOBS
 
 
+def test_retention_sweep_skips_active_jobs(monkeypatch, outputs_dir):
+    job_id = "66666666-6666-6666-6666-666666666666"
+    job_dir = outputs_dir / job_id
+    job_dir.mkdir()
+    (job_dir / "original.wav").write_bytes(b"still-processing")
+    expired = time.time() - (25 * 3600)
+    os.utime(job_dir, (expired, expired))
+    separate.JOBS[job_id] = separate.Job(status="processing")
+    monkeypatch.setattr(separate, "FILE_RETENTION_HOURS", 24.0)
+
+    assert separate.sweep_expired_jobs() == 0
+    assert job_dir.exists()
+    assert job_id in separate.JOBS
+
+
 def test_retention_sweep_handles_missing_files(monkeypatch, outputs_dir):
     gone_id = "77777777-7777-7777-7777-777777777777"
     gone_dir = outputs_dir / gone_id
     gone_dir.mkdir()
     expired = time.time() - (30 * 3600)
     os.utime(gone_dir, (expired, expired))
-    separate.JOBS[gone_id] = separate.Job()
+    separate.JOBS[gone_id] = separate.Job(status="done")
     monkeypatch.setattr(separate, "FILE_RETENTION_HOURS", 24.0)
 
     # Directory vanishes between stat() and rmtree(); cleanup must not raise.

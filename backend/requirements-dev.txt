@@ -1,2 +1,6 @@
+# Keep CI/unit-test dependencies small; the production image is validated by
+# the Docker build in CI and installs the full Demucs/Torch requirements.
+fastapi==0.115.6
+python-multipart==0.0.20
 pytest>=8.3
 httpx>=0.27

@@ -11,6 +11,12 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m py_compile backend/app/main.py backend/app/routers/separate.py backend/app/services/demucs_service.py backend/app/services/ffmpeg_service.py
+      # Unit tests need FastAPI but do not need the large Demucs/Torch runtime.
+      # The production dependency set is validated by the Docker build below.
+      - run: pip install -r backend/requirements-dev.txt
+      - run: python -m pytest backend/tests -q
+        env:
+          OUTPUTS_DIR: /tmp/mutemusic-ci-outputs
       - run: docker build -t mutemusic-backend ./backend
   mobile:
     runs-on: ubuntu-latest

@@ -125,6 +125,11 @@ def sweep_expired_jobs() -> int:
     for entry in entries:
         if not entry.is_dir():
             continue
+        # A long-running separation must not lose its working directory while
+        # Demucs or FFmpeg is still writing into it.
+        active_job = JOBS.get(entry.name)
+        if active_job and active_job.status in {"queued", "processing"}:
+            continue
         try:
             age_seconds = now - entry.stat().st_mtime
         except OSError:
@@ -215,9 +220,10 @@ async def create_separation(
             source.unlink(missing_ok=True)
             raise HTTPException(status_code=413, detail="Video exceeds 30 minute duration limit")
     except HTTPException:
+        shutil.rmtree(directory, ignore_errors=True)
         raise
     except Exception as exc:
-        source.unlink(missing_ok=True)
+        shutil.rmtree(directory, ignore_errors=True)
         raise HTTPException(status_code=422, detail=f"Unable to read media: {exc}") from exc
     JOBS[job_id] = Job(is_video=video, quality=quality)
     background_tasks.add_task(_process, job_id, source, mode, quality)
@@ -250,6 +256,11 @@ async def delete_job(job_id: str) -> JobDeletedResponse:
         uuid.UUID(job_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail="Job not found") from exc
+    job = JOBS.get(job_id)
+    if job and job.status in {"queued", "processing"}:
+        # Deleting the directory while Demucs is writing can recreate files
+        # after a successful-looking deletion. Keep the delete promise honest.
+        raise HTTPException(status_code=409, detail="Job is still processing")
     delete_job_files(job_id)
     JOBS.pop(job_id, None)
     return JobDeletedResponse(job_id=job_id, status="deleted")
