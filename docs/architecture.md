@@ -1,6 +1,6 @@
 # Architecture
 
-The Flutter client uploads selected media to FastAPI and polls a job record. The API writes each job to `/tmp/outputs/<job_id>`, stores its state in SQLite outside the public outputs directory, uses FFmpeg to extract or remux media, and invokes `demucs --two-stems=vocals -n htdemucs`. Completed files are exposed only beneath the matching job directory via the `/outputs` static route.
+The Flutter client uploads selected media to FastAPI and polls a job record. In the container, the API writes each job to `/data/outputs/<job_id>` and stores its state in `/data/jobs.sqlite3`, outside the public outputs directory. `/data` is a persistent named volume. FFmpeg extracts or remuxes media and Demucs runs `--two-stems=vocals -n htdemucs`. Completed files are exposed only beneath the matching job directory via the `/outputs` static route.
 
 `BackgroundTasks` is deliberately an MVP choice. It does not survive restarts and shares CPU with API requests. SQLite restores completed result records after restart, while interrupted queued/processing work becomes failed honestly because it cannot resume. Production should retain the job-registry contract but replace its implementation with Redis plus Celery workers, move media into Supabase Storage, store job state in Postgres, use signed URLs, and enforce authenticated ownership.
 

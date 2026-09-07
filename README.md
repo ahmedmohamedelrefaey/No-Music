@@ -9,7 +9,7 @@ Flutter (Riverpod + Dio)
         | multipart / polling
 FastAPI API ── BackgroundTasks ── FFmpeg ── Demucs htdemucs
         |                              |
-   /tmp/outputs static files <───────────┘
+ /data volume: outputs + SQLite <─────────┘
 ```
 
 ## Setup
@@ -27,8 +27,21 @@ Windows PowerShell activation is `.venv\Scripts\Activate.ps1`.
 
 ```bash
 docker build -t mutemusic-backend ./backend
-docker run -p 8000:8000 --env-file backend/.env mutemusic-backend
+docker volume create mutemusic-data
+docker run -p 8000:8000 --env-file backend/.env -v mutemusic-data:/data mutemusic-backend
 ```
+
+Oracle Linux / Podman uses the same persistent data layout. The `:Z` suffix
+sets the correct SELinux label for the mounted volume:
+
+```bash
+podman volume create mutemusic-data
+podman run -d --name no-music --restart=always -p 8000:8000 --env-file /home/opc/backend/.env -v mutemusic-data:/data:Z mutemusic-backend
+```
+
+The named volume keeps processed outputs and `jobs.sqlite3` when the container
+is restarted or replaced. The image also includes a `/health` container health
+check. Do not mount or publish `/data` directly through a web server.
 
 For mobile, install Flutter 3.22+, then:
 
