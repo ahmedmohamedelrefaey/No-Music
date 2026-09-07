@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import shutil
+import sqlite3
 import threading
 import time
 import uuid
@@ -20,6 +21,11 @@ from app.services.ffmpeg_service import extract_audio, is_video, mux_audio, prob
 router = APIRouter(prefix="/api/v1", tags=["separation"])
 logger = logging.getLogger(__name__)
 OUTPUTS_DIR = Path(os.getenv("OUTPUTS_DIR", "/tmp/outputs"))
+# Keep the registry outside /outputs because that directory is mounted as a
+# public static route. Production can point this at a persistent volume.
+JOB_STORE_PATH = Path(
+    os.getenv("JOB_STORE_PATH", str(OUTPUTS_DIR.parent / "mutemusic-jobs.sqlite3"))
+)
 MAX_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(500 * 1024 * 1024)))
 MAX_DURATION = float(os.getenv("MAX_VIDEO_DURATION_SECONDS", "1800"))
 ALLOWED_SUFFIXES = {".wav", ".mp3", ".m4a", ".aac", ".ogg", ".flac", ".mp4", ".mov", ".mkv", ".avi", ".webm"}
@@ -73,6 +79,123 @@ class Job:
 
 
 JOBS: dict[str, Job] = {}
+_JOB_STATUSES = {"queued", "processing", "done", "failed"}
+
+
+def _job_store_connection() -> sqlite3.Connection:
+    JOB_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(JOB_STORE_PATH, timeout=5)
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS jobs (
+            job_id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            progress INTEGER NOT NULL,
+            error TEXT,
+            stage TEXT,
+            quality TEXT NOT NULL,
+            vocals TEXT,
+            instrumental TEXT,
+            video TEXT,
+            is_video INTEGER NOT NULL,
+            created_at REAL NOT NULL
+        )
+        """
+    )
+    return connection
+
+
+def persist_job(job_id: str, job: Job) -> None:
+    """Persist public job state without storing file paths or media contents."""
+    try:
+        with _job_store_connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO jobs (
+                    job_id, status, progress, error, stage, quality, vocals,
+                    instrumental, video, is_video, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                    status = excluded.status,
+                    progress = excluded.progress,
+                    error = excluded.error,
+                    stage = excluded.stage,
+                    quality = excluded.quality,
+                    vocals = excluded.vocals,
+                    instrumental = excluded.instrumental,
+                    video = excluded.video,
+                    is_video = excluded.is_video,
+                    created_at = excluded.created_at
+                """,
+                (
+                    job_id,
+                    job.status,
+                    job.progress,
+                    job.error,
+                    job.stage,
+                    job.quality,
+                    job.vocals,
+                    job.instrumental,
+                    job.video,
+                    int(job.is_video),
+                    job.created_at,
+                ),
+            )
+    except sqlite3.Error:
+        logger.exception("Could not persist job %s", job_id)
+
+
+def remove_persisted_job(job_id: str) -> None:
+    try:
+        with _job_store_connection() as connection:
+            connection.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
+    except sqlite3.Error:
+        logger.exception("Could not remove persisted job %s", job_id)
+
+
+def restore_jobs() -> int:
+    """Restore completed jobs after an API restart.
+
+    In-progress processes cannot be resumed by BackgroundTasks, so they are
+    exposed as failed rather than pretending to still be running.
+    """
+    try:
+        with _job_store_connection() as connection:
+            rows = connection.execute("SELECT * FROM jobs").fetchall()
+    except sqlite3.Error:
+        logger.exception("Could not restore persisted jobs")
+        return 0
+
+    JOBS.clear()
+    restored = 0
+    for row in rows:
+        job_id = row["job_id"]
+        if not (OUTPUTS_DIR / job_id).is_dir():
+            remove_persisted_job(job_id)
+            continue
+        if row["status"] not in _JOB_STATUSES:
+            remove_persisted_job(job_id)
+            continue
+        job = Job(
+            status=row["status"],
+            progress=row["progress"],
+            error=row["error"],
+            stage=row["stage"],
+            quality=row["quality"],
+            vocals=row["vocals"],
+            instrumental=row["instrumental"],
+            video=row["video"],
+            is_video=bool(row["is_video"]),
+            created_at=row["created_at"],
+        )
+        if job.status in {"queued", "processing"}:
+            job.status, job.stage = "failed", None
+            job.error = "Processing interrupted by a server restart"
+            persist_job(job_id, job)
+        JOBS[job_id] = job
+        restored += 1
+    return restored
 
 
 class QueuedResponse(BaseModel):
@@ -144,6 +267,7 @@ def sweep_expired_jobs() -> int:
             logger.warning("Retention cleanup failed for job %s", entry.name)
             continue
         JOBS.pop(entry.name, None)
+        remove_persisted_job(entry.name)
         removed += 1
     return removed
 
@@ -164,10 +288,12 @@ def _process(job_id: str, source: Path, mode: str, quality: str) -> None:
     if job is None:
         return  # deleted before the worker started
     job.status, job.progress, job.stage = "processing", 5, "analyzing"
+    persist_job(job_id, job)
     directory = source.parent
     try:
         audio_source = extract_audio(source, directory / "source.wav") if job.is_video else source
         job.progress, job.stage = 20, "separating"
+        persist_job(job_id, job)
         if quality == "deep":
             with _DEEP_JOB_SLOTS:
                 if JOBS.get(job_id) is not job:
@@ -180,14 +306,17 @@ def _process(job_id: str, source: Path, mode: str, quality: str) -> None:
         shutil.copy2(instrumental, target_music)
         job.vocals, job.instrumental, job.progress = target_vocals.name, target_music.name, 85
         job.stage = "finalizing"
+        persist_job(job_id, job)
         if job.is_video:
             selected = target_vocals if mode == "keep_vocals" else target_music
             video = mux_audio(source, selected, directory / "cleaned_video.mp4")
             job.video = video.name
         job.progress, job.stage, job.status = 100, None, "done"
+        persist_job(job_id, job)
     except Exception as exc:  # preserve a readable job failure for polling clients
         logger.exception("Audio separation job %s failed", job_id)
         job.status, job.stage, job.error = "failed", None, str(exc)
+        persist_job(job_id, job)
 
 
 @router.post("/separate", response_model=QueuedResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -226,6 +355,7 @@ async def create_separation(
         shutil.rmtree(directory, ignore_errors=True)
         raise HTTPException(status_code=422, detail=f"Unable to read media: {exc}") from exc
     JOBS[job_id] = Job(is_video=video, quality=quality)
+    persist_job(job_id, JOBS[job_id])
     background_tasks.add_task(_process, job_id, source, mode, quality)
     return QueuedResponse(job_id=job_id, status="queued")
 
@@ -263,4 +393,5 @@ async def delete_job(job_id: str) -> JobDeletedResponse:
         raise HTTPException(status_code=409, detail="Job is still processing")
     delete_job_files(job_id)
     JOBS.pop(job_id, None)
+    remove_persisted_job(job_id)
     return JobDeletedResponse(job_id=job_id, status="deleted")

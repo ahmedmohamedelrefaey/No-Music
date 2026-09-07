@@ -18,7 +18,7 @@ Quality mapping: `fast` uses default htdemucs settings; `deep` runs Demucs with 
 {"progress":42,"status":"processing","stage":"separating"}
 ```
 
-Statuses are `queued`, `processing`, `done`, or `failed`. `stage` is optional (`analyzing`, `separating`, `finalizing`) and lets clients show honest processing phases instead of inventing percentages; it is `null` when done. Unknown jobs return 404.
+Statuses are `queued`, `processing`, `done`, or `failed`. `stage` is optional (`analyzing`, `separating`, `finalizing`) and lets clients show honest processing phases instead of inventing percentages; it is `null` when done. Completed records survive API restart through the configured SQLite registry. Work interrupted by restart becomes `failed`, because BackgroundTasks cannot resume it. Unknown jobs return 404.
 
 ## GET /api/v1/result/{job_id}
 
@@ -32,7 +32,7 @@ Returns 409 while processing, 422 after a failed job, and 404 for unknown jobs (
 
 ## DELETE /api/v1/jobs/{job_id}
 
-Deletes the job's uploaded input and all generated outputs, and drops the job record. The id is validated as a UUID before any filesystem access, and only `OUTPUTS_DIR/<job_id>` is ever removed, so no other job's files can be touched. Idempotent: unknown-but-valid UUIDs return 200; malformed ids return 404.
+Deletes the job's uploaded input and all generated outputs, and drops the job record. The id is validated as a UUID before any filesystem access, and only `OUTPUTS_DIR/<job_id>` is ever removed, so no other job's files can be touched. A queued or processing job returns 409: its working directory is protected until it completes, because background work cannot be safely cancelled in this MVP. Unknown-but-valid UUIDs return 200; malformed ids return 404.
 
 ```json
 {"job_id":"uuid","status":"deleted"}

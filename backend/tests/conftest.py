@@ -7,6 +7,7 @@ from pathlib import Path
 # OUTPUTS_DIR is bound at import time, so it must be configured before app modules load.
 _OUTPUTS = Path(tempfile.mkdtemp(prefix="mutemusic-tests-"))
 os.environ["OUTPUTS_DIR"] = str(_OUTPUTS)
+os.environ["JOB_STORE_PATH"] = str(_OUTPUTS.parent / f"{_OUTPUTS.name}-jobs.sqlite3")
 os.environ.pop("FILE_RETENTION_HOURS", None)
 
 import shutil

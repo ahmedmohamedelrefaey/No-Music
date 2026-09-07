@@ -102,6 +102,35 @@ def test_video_input_produces_video_url(client, fake_separation):
     assert result["video_url_if_needed"].endswith(f"/outputs/{job_id}/cleaned_video.mp4")
 
 
+def test_completed_job_survives_registry_restore(client, fake_separation):
+    job_id = upload(client, quality="deep").json()["job_id"]
+
+    # Simulate the in-memory registry being lost when the API process restarts.
+    separate.JOBS.clear()
+    separate.restore_jobs()
+
+    status = client.get(f"/api/v1/status/{job_id}")
+    result = client.get(f"/api/v1/result/{job_id}")
+    assert status.json()["status"] == "done"
+    assert result.status_code == 200
+    assert result.json()["vocals_url"].endswith(f"/outputs/{job_id}/vocals.wav")
+
+
+def test_active_job_is_marked_failed_after_registry_restore(client, outputs_dir):
+    job_id = str(uuid.uuid4())
+    job_dir = outputs_dir / job_id
+    job_dir.mkdir()
+    separate.JOBS[job_id] = separate.Job(status="processing", progress=42, stage="separating")
+    separate.persist_job(job_id, separate.JOBS[job_id])
+
+    separate.JOBS.clear()
+    separate.restore_jobs()
+
+    status = client.get(f"/api/v1/status/{job_id}")
+    assert status.json()["status"] == "failed"
+    assert status.json()["stage"] is None
+
+
 def test_delete_job_removes_only_its_files(client, fake_separation, outputs_dir):
     first = upload(client).json()["job_id"]
     second = upload(client).json()["job_id"]

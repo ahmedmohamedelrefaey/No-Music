@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routers.separate import OUTPUTS_DIR, retention_loop, router
+from app.routers.separate import OUTPUTS_DIR, restore_jobs, retention_loop, router
 
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 origins = [value.strip() for value in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000").split(",") if value.strip()]
@@ -17,6 +17,7 @@ origins = [value.strip() for value in os.getenv("ALLOWED_ORIGINS", "http://local
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    restore_jobs()
     sweeper = asyncio.create_task(retention_loop())
     yield
     sweeper.cancel()
