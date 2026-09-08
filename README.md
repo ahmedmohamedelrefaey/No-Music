@@ -35,13 +35,16 @@ Oracle Linux / Podman uses the same persistent data layout. The `:Z` suffix
 sets the correct SELinux label for the mounted volume:
 
 ```bash
+podman build --format docker -t mutemusic-backend ./backend
 podman volume create mutemusic-data
-podman run -d --name no-music --restart=always -p 8000:8000 --env-file /home/opc/backend/.env -v mutemusic-data:/data:Z mutemusic-backend
+podman run -d --name no-music --restart=always --health-on-failure=restart -p 8000:8000 --env-file /home/opc/backend/.env -v mutemusic-data:/data:Z mutemusic-backend
 ```
 
 The named volume keeps processed outputs and `jobs.sqlite3` when the container
 is restarted or replaced. The image also includes a `/health` container health
 check. Do not mount or publish `/data` directly through a web server.
+Podman must build with `--format docker`; its default OCI image format ignores
+Dockerfile health checks.
 
 For mobile, install Flutter 3.22+, then:
 
