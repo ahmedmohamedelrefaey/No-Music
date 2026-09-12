@@ -4,11 +4,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     OUTPUTS_DIR=/data/outputs \
-    JOB_STORE_PATH=/data/jobs.sqlite3
+    JOB_STORE_PATH=/data/jobs.sqlite3 \
+    OMP_NUM_THREADS=4 \
+    MKL_NUM_THREADS=4 \
+    OPENBLAS_NUM_THREADS=4 \
+    VECLIB_MAXIMUM_THREADS=4
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN python -c "from demucs.api import Separator; Separator('htdemucs')"
 COPY app ./app
 RUN useradd --create-home appuser \
     && mkdir -p /data/outputs \

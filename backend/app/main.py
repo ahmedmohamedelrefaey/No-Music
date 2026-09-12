@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,14 +11,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.routers.separate import OUTPUTS_DIR, restore_jobs, retention_loop, router
+from app.services.demucs_service import warmup_model
 
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 origins = [value.strip() for value in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000").split(",") if value.strip()]
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     restore_jobs()
+    await asyncio.to_thread(warmup_model)
     sweeper = asyncio.create_task(retention_loop())
     yield
     sweeper.cancel()
