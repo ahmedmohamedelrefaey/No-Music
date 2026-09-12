@@ -15,7 +15,7 @@ from typing import Literal
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 
-from app.services.demucs_service import separate_audio
+from app.services.demucs_service import separate_audio, separate_audio_quantized
 from app.services.ffmpeg_service import extract_audio, is_video, mux_audio, probe_duration
 
 router = APIRouter(prefix="/api/v1", tags=["separation"])
@@ -31,7 +31,7 @@ MAX_DURATION = float(os.getenv("MAX_VIDEO_DURATION_SECONDS", "1800"))
 ALLOWED_SUFFIXES = {".wav", ".mp3", ".m4a", ".aac", ".ogg", ".flac", ".mp4", ".mov", ".mkv", ".avi", ".webm"}
 DEFAULT_RETENTION_HOURS = 24.0
 RETENTION_SWEEP_SECONDS = 15 * 60
-Quality = Literal["fast", "deep"]
+Quality = Literal["fast", "deep", "experimental"]
 
 
 def parse_retention_hours(raw: str | None, default: float = DEFAULT_RETENTION_HOURS) -> float:
@@ -299,6 +299,8 @@ def _process(job_id: str, source: Path, mode: str, quality: str) -> None:
                 if JOBS.get(job_id) is not job:
                     return  # deleted while waiting for a deep-clean slot
                 vocals, instrumental = separate_audio(audio_source, directory / "demucs", quality)
+        elif quality == "experimental":
+            vocals, instrumental = separate_audio_quantized(audio_source, directory / "demucs")
         else:
             vocals, instrumental = separate_audio(audio_source, directory / "demucs", quality)
         target_vocals, target_music = directory / "vocals.wav", directory / "instrumental.wav"
