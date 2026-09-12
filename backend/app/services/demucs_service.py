@@ -12,22 +12,16 @@ logger = logging.getLogger(__name__)
 DEEP_SHIFTS = "5"
 DEEP_OVERLAP = "0.5"
 
-_SEPARATOR = None
 
-
-def _get_separator():
-    """Lazy-load and cache the Demucs Separator instance."""
-    global _SEPARATOR
-    if _SEPARATOR is None:
-        try:
-            from demucs.api import Separator
-            logger.info("Loading htdemucs model (first call)...")
-            _SEPARATOR = Separator("htdemucs")
-            logger.info("htdemucs model loaded and cached")
-        except Exception:
-            logger.exception("Failed to pre-load Demucs model")
-            raise
-    return _SEPARATOR
+def _warmup_demucs():
+    """Pre-download htdemucs weights so first separation is faster."""
+    try:
+        from demucs.pretrained import get_model
+        logger.info("Pre-downloading htdemucs model weights...")
+        get_model("htdemucs")
+        logger.info("htdemucs model weights cached")
+    except Exception:
+        logger.exception("Model warmup failed (non-fatal)")
 
 
 class DemucsError(RuntimeError):
@@ -35,12 +29,12 @@ class DemucsError(RuntimeError):
 
 
 def warmup_model() -> bool:
-    """Pre-load the Demucs model at server startup to avoid first-job delay."""
+    """Pre-download Demucs model weights at server startup."""
     try:
-        _get_separator()
+        _warmup_demucs()
         return True
     except Exception:
-        logger.exception("Model warmup failed")
+        logger.exception("Model warmup failed (non-fatal)")
         return False
 
 
