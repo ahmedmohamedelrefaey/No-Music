@@ -14,9 +14,9 @@ DEEP_SHIFTS = "5"
 DEEP_OVERLAP = "0.5"
 
 # Experimental quantized path mirrors the CLI "fast" settings exactly:
-# htdemucs, two stems (vocals + no_vocals), segment within the transformer's
-# 10s training length, 0.25 overlap, 16-bit WAV output.
-EXPERIMENT_SEGMENT = 10.0
+# htdemucs, two stems (vocals + no_vocals), 7s segment (the transformer's
+# 7.8s training limit), 0.25 overlap, 16-bit WAV output.
+EXPERIMENT_SEGMENT = 7.0
 EXPERIMENT_OVERLAP = 0.25
 
 _Q_MODEL = None
@@ -54,7 +54,7 @@ def separate_audio(input_path: Path, output_root: Path, quality: str = "fast") -
     if quality == "deep":
         command += ["--shifts", DEEP_SHIFTS, "--overlap", DEEP_OVERLAP]
     else:
-        command += ["--segment", "10", "--overlap", "0.25"]
+        command += ["--segment", "7", "--overlap", "0.25"]
     command.append(str(input_path))
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     if result.returncode != 0:
