@@ -45,7 +45,7 @@ def separate_audio(input_path: Path, output_root: Path, quality: str = "fast") -
     if quality == "deep":
         command += ["--shifts", DEEP_SHIFTS, "--overlap", DEEP_OVERLAP]
     else:
-        command += ["--segment", "7", "--overlap", "0.25"]
+        command += ["--segment", "15", "--overlap", "0.25"]
     command.append(str(input_path))
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     if result.returncode != 0:
